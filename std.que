@@ -1,0 +1,30 @@
+
+!if !os "Windows"{
+    !asmtext "extern ExitProcess"
+}
+def @start() -> i32{
+    !ldflags ["-e", "start"]
+    !if !os "Windows"{
+        !asmtext "call main"
+        !asmtext "xor rcx, rcx"
+        !ifdef !main64{!asmtext "mov rcx, rax"}
+        !eifdef !main32{!asmtext "mov ecx, eax"}
+        !eifdef !main16{!asmtext "mov cx, ax"}
+        !eifdef !main8{!asmtext "mov cl, al"}
+        !else{!asmtext "mov ecx, eax"}
+        !asmtext "call ExitProcess"
+    }
+    !if !os "Linux"{
+        !asmtext "call main"
+        !asmtext "xor rdi, rdi"
+        !ifdef !main64{!asmtext "mov rdi, rax"}
+        !eifdef !main32{!asmtext "mov edi, eax"}
+        !eifdef !main16{!asmtext "mov di, ax"}
+        !eifdef !main8{!asmtext "mov dil, al"}
+        !else{!asmtext "mov edi, eax"}
+        !asmtext "mov rax, 60"
+        !asmtext "syscall"
+        
+    }
+    ret void 
+}

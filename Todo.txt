@@ -1,0 +1,16 @@
+function pointer - [
+
+]
+
+bit wise  ops - [
+
+]
+
+If  - [
+
+]
+
+Struct - [
+
+]
+
