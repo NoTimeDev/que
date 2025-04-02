@@ -9,22 +9,22 @@ class Env:
         self.VReg: dict = {}
     def AddFunc(self, Name, Value):
         self.Funcs.update({Name  : Value})
-    def GetFunc(self, Name):
+    def GetFunc(self, Name) -> dict:
         if self.Funcs.get(Name) == None and self.Parent != None:
             return self.Parent.GetFunc(Name)
         elif self.Funcs.get(Name) != None:
-            return self.Funcs.get(Name)
+            return cast(dict, self.Funcs.get(Name))
         else:
-            return None 
+            return cast(dict, None )
     def AddVar(self, Name, Value):
         self.VReg.update({Name : Value})
-    def GetVar(self, Name):
+    def GetVar(self, Name) -> dict:
         if self.VReg.get(Name) == None and self.Parent != None:
             return self.Parent.GetVar(Name)
         elif self.VReg.get(Name) != None:
-            return self.VReg.get(Name)
+            return cast(dict, self.VReg.get(Name))
         else:
-            return None
+            return cast(dict, None)
     def Removevar(self, Name):
         if self.VReg.get("Name") == None and self.Parent != None:
             self.Parent.Removevar(Name)
@@ -655,7 +655,7 @@ class CodeGen:
                             self.Info['AllocSpace']+=int(esize) // 8
                             space = f"[rbp-{self.Info['AllocSpace']}]"
 
-                        self.Text.append(f"\tmov {self.GetDataSize(esize, type_="Simd")} {space}, {reg}")
+                        self.Text.append(f"\tmov {self.GetDataSize(esize, type_='Simd')} {space}, {reg}")
                         elemet['InReg'] = False
                         elemet['Register'] = space   
                         self.VarWithRegName_Simd.remove(i) 
@@ -740,7 +740,7 @@ class CodeGen:
                 reg = self.GetReg(Node['Type']['Size'], type_="Simd") # type: ignore[]
                 
                 if Node['Pointer'] == False:
-                    self.Text.append(f"\tmovs{self.GetDataSize(Node['Type']['Size'], type_="Simd")} {reg}, {Var['Register']}") #type: ignore[]
+                    self.Text.append(f"\tmovs{self.GetDataSize(Node['Type']['Size'], type_='Simd')} {reg}, {Var['Register']}") #type: ignore[]
                 else:
                     regy = self.ensureload(Var['Register'], "64") #type: ignore[]
                     self.Text.append(f"\tmovs{self.GetDataSize(Node['Type']['Size'], type_='Simd')} {reg}, [{regy}]")
@@ -878,14 +878,14 @@ class CodeGen:
                             self.Info['AllocSpace']+=int(esize) // 8
                             space = f"[rbp-{self.Info['AllocSpace']}]"
 
-                        self.Text.append(f"\tmov {self.GetDataSize(esize, type_="Simd")} {space}, {reg}")
+                        self.Text.append(f"\tmov {self.GetDataSize(esize, type_='Simd')} {space}, {reg}")
                         elemet['InReg'] = False
                         elemet['Register'] = space   
                         self.VarWithRegName_Simd.remove(i) 
                     elif elemet["Ditch"] == True and elemet["Register"] == reg: 
                         self.VarWithRegName_Simd.remove(i) 
                 
-                self.RRegister['Simd'].append(self.URegister['Simd'].pop(pos_))
+                self.RRegister['Simd'].append(self.URegister['Simd'].pop(pos))
                 return reg 
     
     def protectreg(self, reg, size):
@@ -951,7 +951,7 @@ class CodeGen:
     def GenSizeNode(self, Node):
         Var = self.GenNode(Node.get("Old", ""))
 
-        ls = self.GetRegList(Var)
+        ls = cast(list, self.GetRegList(Var))
         if ls[0] == Var:
             vsize = "64"
         elif ls[1] == Var:
@@ -1310,7 +1310,8 @@ class CodeGen:
             tsize = int(Node['Type']['Size'])
             self.Info["AllocSpace"]+=tsize // 8 
             space = f"[rbp-{self.Info['AllocSpace']}]"
-                
+        else:
+            space = 0
         
         Name = Node['Name']
             
@@ -1387,8 +1388,8 @@ class CodeGen:
                 self.VarWithRegName.append(Node['Name'])
                 
     def GenLoadPtrNode(self, Node):
+        var = self.Env.GetVar(Node['Loading'])
         if Node['Type']['Kind'] == "Primitive":
-            var = self.Env.GetVar(Node['Loading'])
             if Node['Type']['Val'][0] == "f":
                 reg = self.GetReg(Node['Type']['Size'], type_="Simd")
                 if var['InReg'] == False:
@@ -1662,14 +1663,14 @@ class CodeGen:
                         Size = int(i['Type']['Size']) // 8
                         if i['Type']['Val'][0] == 'i':
                             val = self.GenNode(i['Value'])
-                            self.Text.append(f"\tpush {self.GetSizeOfReg("64", val)}")
+                            self.Text.append(f"\tpush {self.GetSizeOfReg('64', val)}")
                         if i['Type']['Val'][0] == 'f':
                             val = self.GenNode(i['Value'])
                             self.Text.append(f"\tmov [rsp-{floatcount}], {val}")
                             floatcount+= int(i['Type']['Val'][1:]) // 8  
                     if i['Type']['Kind'] == "Pointer":
                         val = self.GenNode(i['Value'])
-                        self.Text.append(f"\tpush {self.GetSizeOfReg("64", val)}")    
+                        self.Text.append(f"\tpush {self.GetSizeOfReg('64', val)}")    
                 
                 self.Info['AllocSpace']+=floatcount
 
