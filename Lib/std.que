@@ -2,7 +2,15 @@
 !if !os "Windows"{
     !asmtext "extern ExitProcess"
 }
+
 def @start() -> i32{
+!ifdef !linkc{
+    !if !os "Linux"{
+        !ldflags ["-dynamic-linker", "/lib64/ld-linux-x86-64.so.2", "-lc"]
+    }
+    !if !os "Windows"{
+    }
+}
     !ldflags ["-e", "start"]
     !if !os "Windows"{
         !asmtext "call main"

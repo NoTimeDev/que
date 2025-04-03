@@ -1,31 +1,21 @@
-include "std.que"
+include "./Lib/std.que"
 
-extern @printint(ptr) -> void
-extern @printstr(ptr) -> void 
+global [30]i8, 30 -> @.str1 = [!str"The Number in MyVar1 is: \n"]
+global i32, 4 -> @.int1 = 90 
 
-const global [30]i8, 30 -> @.str = [!str"The Number Returned is: \0"] 
-const global [2]i8, 1 -> @.str1 = [!str"\n\0"]
+global [10]i8, 10 -> @.buffer = [!str"de Hello\n\0"] 
 
-!ldflags ["./Libby.o", "-lkernel32", "-lmsvcrt"]
-
-private def @Add(i32 $.1, i32 $.2, i32 $.3, i32 $.4, i32 $.5, i32 $.6, i32 $.7, i32 $.8, i32 $.9) -> i32{
-    load $.8, i32 -> $.lol 
-    load $.9, i32 -> $.lol1
-    add i32 $.lol, $.lol1 -> $.boom
-    load $.boom, i32 -> $.booml
-    ret $.booml, i32
-}
+extern @que_int_to_str(ptr, ptr) -> ptr 
+extern @que_print_(i32, ptr) -> void
+extern @que_strlen(ptr) -> void 
+!ldflags ["./Lib/SFiles/sysd_linux.o", "./Lib/SFiles/stdio_linux.o"]
 
 def @main() -> i32{
-    call @Add(i32 1, i32 2, i32 3, i32 4, i32 5, i32 6, i32 7, i32 8, i32 9), i32 -> $.1  
-    getptr $.1, ptr -> $.2
-    getptr @.str, ptr -> $.lstr 
-    load $.lstr, ptr -> $.loadedstr 
-    call @printstr(ptr $.loadedstr), void 
-    load $.2, ptr -> $.l2 
-    call @printint(ptr $.l2), void 
-    getptr @.str1, ptr -> $.lstr1 
-    load $.lstr1, ptr -> $.loadedstr1 
-    call @printstr(ptr $.loadedstr1), void 
-    ret $.2, i32
+    getptr @.int1, ptr -> $.s1 
+    load $.s1, ptr -> $.3
+    getptr @.buffer, ptr -> $.s2
+    load $.s2, ptr -> $.4
+    call @que_int_to_str(ptr $.3, ptr $.4), void 
+    call @que_strlen(ptr $.4), void 
+    ret 1, i32  
 }

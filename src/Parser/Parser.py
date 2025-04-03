@@ -112,7 +112,7 @@ class Parser:
 
         self.Expect(TokenKind.close_paren, ')')
 
-        self.Expect(TokenKind.comma, "->")
+        self.Expect(TokenKind.comma, ",")
         
         RetType = self.ParseType()
             
@@ -535,6 +535,7 @@ class Parser:
                 "Body" : Tree['Body']
             }
 
+        return {"Kind" : "ignore"}
     def ParseMeta(self) -> dict:
         tk = self.Advance()
         
@@ -588,6 +589,7 @@ class Parser:
                 if self.CToken().Kind == TokenKind.comma:
                     self.Advance()
             self.Expect(TokenKind.close_bracket, "]")
+            return {"Kind" : "ignore"}
         elif tk.Value == "!asmtext":
             code = self.Expect(TokenKind.str_const, "a string")
             return {

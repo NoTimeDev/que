@@ -250,30 +250,29 @@ class CodeGen:
                                 self.VarWithRegName_Simd.append(i['Name'])
                     if i['Type']['Kind'] == "Pointer":
                         self.Info['AllocSpace']+=8 
-                        if i['Type']['Val'][0] == 'i':
-                            if intargs >= 6: 
-                                stackpos+=1
-                                self.Env.AddVar(i['Name'], {
-                                    "Type" : i['Type'],
-                                    "Register" : f"[rbp+{stacksize}]",
-                                    "MustLoad" : False,
-                                    "InReg" : True,
-					                "Ditch" : False,
-                                    "Simd" : False,
-                                })          
-                                self.VarWithRegName.append(i['Name'])
-                            else:
-                                intargs+=1
-                                self.Text.append(f"\tmov qword [rbp-{self.Info['AllocSpace']}], {args_reg_int[str(intargs)]}")
-                                self.Env.AddVar(i['Name'], {
-                                    "Type" : i['Type'],
-                                    "Register" : f"[rbp-{self.Info['AllocSpace']}]",
-                                    "MustLoad" : False,
-                                    "InReg" : False,
-					                "Ditch" : False,
-                                    "Simd" : False,
-                                })          
-                                self.VarWithRegName.append(i['Name'])
+                        if intargs >= 6: 
+                            stackpos+=1
+                            self.Env.AddVar(i['Name'], {
+                                "Type" : i['Type'],
+                                "Register" : f"[rbp+{stacksize}]",
+                                "MustLoad" : False,
+                                "InReg" : True,
+                                "Ditch" : False,
+                                "Simd" : False,
+                            })          
+                            self.VarWithRegName.append(i['Name'])
+                        else:
+                            intargs+=1
+                            self.Text.append(f"\tmov qword [rbp-{self.Info['AllocSpace']}], {args_reg_int[str(intargs)]}")
+                            self.Env.AddVar(i['Name'], {
+                                "Type" : i['Type'],
+                                "Register" : f"[rbp-{self.Info['AllocSpace']}]",
+                                "MustLoad" : False,
+                                "InReg" : False,
+					            "Ditch" : False,
+                                "Simd" : False,
+                            })          
+                            self.VarWithRegName.append(i['Name'])
                        
         elif self.plat == "Windows":
             args_reg_int = {
@@ -1596,6 +1595,7 @@ class CodeGen:
             }
 
             self.ReserveReg("rdi", "64")
+            self.ReserveReg("rax", "64")
             self.ReserveReg("rsi", "64")
             self.ReserveReg("rdx", "64")
             self.ReserveReg("rcx", "64")
@@ -1662,13 +1662,16 @@ class CodeGen:
                     if i['Type']['Kind'] == "Primitive":
                         Size = int(i['Type']['Size']) // 8
                         if i['Type']['Val'][0] == 'i':
+                            self.IntSizes = i['Type']['Size']
                             val = self.GenNode(i['Value'])
                             self.Text.append(f"\tpush {self.GetSizeOfReg('64', val)}")
                         if i['Type']['Val'][0] == 'f':
+                            self.FloatSizes = i['Type']['Size']
                             val = self.GenNode(i['Value'])
                             self.Text.append(f"\tmov [rsp-{floatcount}], {val}")
                             floatcount+= int(i['Type']['Val'][1:]) // 8  
                     if i['Type']['Kind'] == "Pointer":
+                        self.IntSizes = i['Type']['Size']
                         val = self.GenNode(i['Value'])
                         self.Text.append(f"\tpush {self.GetSizeOfReg('64', val)}")    
                 
@@ -1681,15 +1684,18 @@ class CodeGen:
                     if i['Type']['Kind'] == "Primitive":
                         Size = int(i['Type']['Size']) // 8 
                         if i['Type']['Val'][0] == 'i':
+                            self.IntSizes = i['Type']['Size']
                             val = self.GenNode(i['Value'])
                             self.Text.append(f"\tmov {self.GetDataSize(i['Type']['Size'])} {self.GetSizeOfReg(i['Type']['Size'], args_reg_int[str(intcount)])}, {val}")
                             intcount+=1 
                         if i['Type']['Val'][0] == 'f':
+                            self.FloatSizes = i['Type']['Size']
                             val = self.GenNode(i['Value'])
                             self.Text.append(f"\tmovs{self.GetDataSize(i['Type']['Size'], type_='Simd')} {args_reg_float[str(floatcount)]}, {val}")
                             floatcount+=1 
                             floatcountsize+= int(i['Type']['Val'][1:]) // 8  
                     if i['Type']['Kind'] == "Pointer":
+                        self.IntSizes = i['Type']['Size']
                         val = self.GenNode(i['Value'])
                         self.Text.append(f"\tmov qword {args_reg_int[str(intcount)]}, {val}")
                         intcount+=1 
@@ -1700,23 +1706,7 @@ class CodeGen:
                 self.Text.append(f"\tcall {Node['Name'][1:]} wrt ..plt")
             self.Text.append(f"\tadd rsp, {self.aling16(len(floop) * 8)}")
             self.Text.append(f"\t.l_endcall {self.lastcall}")
-            self.ReturnReserve("rdi", "64")
-            self.ReturnReserve("rsi", "64")
-            self.ReturnReserve("rdx", "64")
-            self.ReturnReserve("rcx", "64")
-            self.ReturnReserve("r8", "64")
-            self.ReturnReserve("r9", "64")
-           
-            self.ReturnReserve("xmm0", "0", type_="Simd")
-            self.ReturnReserve("xmm1", "0", type_="Simd")
-            self.ReturnReserve("xmm2", "0", type_="Simd")
-            self.ReturnReserve("xmm3", "0", type_="Simd")
-            self.ReturnReserve("xmm4", "0", type_="Simd")
-            self.ReturnReserve("xmm5", "0", type_="Simd")
-            self.ReturnReserve("xmm6", "0", type_="Simd")
-            self.ReturnReserve("xmm7", "0", type_="Simd")
-                
- 
+
             if Node['RetType']['Kind'] == "Primitive":
                 if Node['RetType']['Val'][0] == "i":
                     self.Info['AllocSpace']+=int(Node['RetType']['Size']) // 8 
@@ -1756,6 +1746,24 @@ class CodeGen:
                         "Simd" : False,
                     })
                     self.VarWithRegName.append(Node['Result'])
+            
+            self.ReturnReserve("rdi", "64")
+            self.ReturnReserve("rax", "64")
+            self.ReturnReserve("rsi", "64")
+            self.ReturnReserve("rdx", "64")
+            self.ReturnReserve("rcx", "64")
+            self.ReturnReserve("r8", "64")
+            self.ReturnReserve("r9", "64")
+           
+            self.ReturnReserve("xmm0", "0", type_="Simd")
+            self.ReturnReserve("xmm1", "0", type_="Simd")
+            self.ReturnReserve("xmm2", "0", type_="Simd")
+            self.ReturnReserve("xmm3", "0", type_="Simd")
+            self.ReturnReserve("xmm4", "0", type_="Simd")
+            self.ReturnReserve("xmm5", "0", type_="Simd")
+            self.ReturnReserve("xmm6", "0", type_="Simd")
+            self.ReturnReserve("xmm7", "0", type_="Simd")
+                
                 
         elif self.plat == "Windows":
             if self.lastcall == None:
@@ -1772,6 +1780,7 @@ class CodeGen:
             }
             
             self.ReserveReg("rcx", "64")
+            self.ReserveReg("rax", "64")
             self.ReserveReg("rdx", "64")
             self.ReserveReg("r8", "64")
             self.ReserveReg("r9", "64")
@@ -1809,14 +1818,17 @@ class CodeGen:
                 self.FloatSizes = i['Type']['Size']
                 if i['Type']['Kind'] == "Primitive":
                     if i['Type']['Val'][0] == "i":
+                        self.IntSizes = i['Type']['Size']
                         val = self.GenNode(i['Value'])
                         self.Text.append(f"\tmov {self.GetDataSize(i['Type']['Size'])} [rsp+{stackpos}], {val}")
                         stackpos+=8 
                     if i['Type']['Val'][0] == "f":
+                        self.FloatSizes = i['Type']['Size']
                         val = self.GenNode(i['Value'])
                         self.Text.append(f"\tmovs{self.GetDataSize(i['Type']['Size'], type_='Simd')} [rsp+{stackpos}], {val}")
                         stackpos+=8 
                 if i['Type']['Kind'] == "Pointer":
+                    self.IntSizes = i['Type']['Size']
                     val = self.GenNode(i['Value'])
                     self.Text.append(f"\tmov qword [rsp+{stackpos}], {val}")
                     stackpos+=8 
@@ -1826,12 +1838,15 @@ class CodeGen:
             for i in oop:
                 if i['Type']['Kind'] == "Primitive":
                     if i['Type']['Val'][0] == "i":
+                        self.IntSizes = i['Type']['Size']
                         val = self.GenNode(i['Value'])
                         self.Text.append(f"\tmov {self.GetDataSize(i['Type']['Size'])} {self.GetSizeOfReg(i['Type']['Size'], args_reg_int[str(argscount)])}, {val}")
                     if i['Type']['Val'][0] == "f":
+                        self.FloatSizes = i['Type']['Size']
                         val = self.GenNode(i['Value'])
                         self.Text.append(f"\tmovs{self.GetDataSize(i['Type']['Size'], type_='Simd')} {args_reg_float[str(argscount)]}, {val}")
                 if i['Type']['Kind'] == "Pointer":
+                    self.IntSizes = i['Type']['Size']
                     val = self.GenNode(i['Value'])
                     self.Text.append(f"\tmov qword {args_reg_int[str(argscount)]}, {val}")
                     
@@ -1842,16 +1857,7 @@ class CodeGen:
             self.Text.append(f"\tadd rsp, {stackpos}")
             self.Text.append(f"\t.w_endcall {self.lastcall}")
 
-            self.ReturnReserve("rcx", "64")
-            self.ReturnReserve("rdx", "64")
-            self.ReturnReserve("r8", "64")
-            self.ReturnReserve("r9", "64")        
-
-            self.ReturnReserve("xmm0", "0", type_="Simd")
-            self.ReturnReserve("xmm1", "0", type_="Simd")
-            self.ReturnReserve("xmm2", "0", type_="Simd")
-            self.ReturnReserve("xmm3", "0", type_="Simd")
-            
+           
             if Node['RetType']['Kind'] == "Primitive":
                 if Node['RetType']['Val'][0] == "i":
                     self.Info['AllocSpace']+=int(Node['RetType']['Size']) // 8 
@@ -1891,6 +1897,17 @@ class CodeGen:
                         "Simd" : False,
                     })
                     self.VarWithRegName.append(Node['Result'])
+            
+            self.ReturnReserve("rcx", "64")
+            self.ReturnReserve("rax", "64")
+            self.ReturnReserve("rdx", "64")
+            self.ReturnReserve("r8", "64")
+            self.ReturnReserve("r9", "64")        
+
+            self.ReturnReserve("xmm0", "0", type_="Simd")
+            self.ReturnReserve("xmm1", "0", type_="Simd")
+            self.ReturnReserve("xmm2", "0", type_="Simd")
+            self.ReturnReserve("xmm3", "0", type_="Simd")
                 
         
     def GenExtern(self, Node):

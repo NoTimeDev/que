@@ -51,6 +51,7 @@ def main(argv: list[str] = sys.argv, argc: list[str] = len(sys.argv)):
             if ErrorClass.meterr == True:
                 printr(ErrorClass.err)
                 exit(1)
+        print(json.dumps(Ast, indent=4))
         CodeGenClass: CodeGen = CodeGen(Ast, platform_)
         Cont = CodeGenClass.Gen()
         
@@ -68,6 +69,9 @@ def main(argv: list[str] = sys.argv, argc: list[str] = len(sys.argv)):
         else:
             subprocess.run(["nasm", Name + ".asm", "-o", Name + ".o","-f", "elf64"])      
             subprocess.run(["ld", Name + ".o", "-o", Name ] + Ast["Meta"]["LinkerFlags"])
-            
+           
+        if "-clean" in argv:
+            os.remove(os.path.abspath(f"./{Name}.asm"))
+            os.remove(os.path.abspath(f"./{Name}.o"))
 if __name__ == '__main__':
     main()
