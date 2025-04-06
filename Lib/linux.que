@@ -1,0 +1,3 @@
+!ldflags ["/home/devvy/Projects/que/Lib/linux.o"]
+
+extern @SYSCALL(i64, i64, i64, i64, i64, i64, i64) -> i32 

@@ -185,13 +185,28 @@ class Lexer:
                     
                     "getptr" : TokenKind.getptr_inst,
                     "geteptr" : TokenKind.geteptr_inst,
-
+                    "getfptr" : TokenKind.getfptr_inst,
+                    
                     "global" : TokenKind.global_inst,
                     "const" : TokenKind.const_inst,
                     "castptr" : TokenKind.castptr_inst,
                     "private" : TokenKind.private_inst,
                     "extern" : TokenKind.extern_inst,
                     "call" : TokenKind.call_inst,
+
+                    "if" : TokenKind.if_inst,
+                    "cmp" : TokenKind.cmp_inst,
+                    "icmp" : TokenKind.icmp_inst,
+                    "fcmp" : TokenKind.fcmp_inst,
+
+                    "goto" : TokenKind.goto_inst,
+                    "le" : TokenKind.cmp,
+                    "leoe" : TokenKind.cmp,
+                    "gt" : TokenKind.cmp,
+                    "gtoe" : TokenKind.cmp,
+                    "eq" : TokenKind.cmp,
+                    "ne" : TokenKind.cmp,
+
 
                     "ptr" : TokenKind.type_,
                     "f64" : TokenKind.type_,
@@ -210,8 +225,11 @@ class Lexer:
                     alpha+=self.Sourecode[pos]
                     pos+=1 
                     col+=1 
-                    
-                if alpha not in list(alphas.keys()):
+                   
+                if self.Sourecode[pos] == ":":
+                    pos+=1; col+=1 
+                    Add(alpha, TokenKind.label_ident, line, start, col) 
+                elif alpha not in list(alphas.keys()):
                     self.errcls.throwerr(line, start, col, f"no such instruction {alpha}")
                 else:
                     Add(alpha, alphas[alpha], line, start, col)
@@ -235,7 +253,7 @@ class Lexer:
                 pos+=1
                 col+=1
 
-                while pos < len(self.Sourecode) and self.Sourecode[pos].isalnum() or self.Sourecode[pos] in ['.', '_']:
+                while pos < len(self.Sourecode) and self.Sourecode[pos].isalnum() or self.Sourecode[pos] in ['.', '_', ':']:
                     treg+=self.Sourecode[pos]
                     pos+=1
                     col+=1

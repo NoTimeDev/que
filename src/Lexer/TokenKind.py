@@ -5,7 +5,6 @@ class TokenKind(Enum):
     int_const = auto()
     str_const = auto()
     float_const = auto()
-
     #instructions or whatever
     loacl_const = auto()
 
@@ -35,6 +34,7 @@ class TokenKind(Enum):
     store_inst = auto()
     getptr_inst = auto()
     geteptr_inst = auto()
+    getfptr_inst = auto()
     castptr_inst = auto()
 
     global_inst = auto()
@@ -42,6 +42,15 @@ class TokenKind(Enum):
     private_inst = auto()
     extern_inst = auto()
     call_inst = auto()
+
+    if_inst = auto()
+
+    icmp_inst = auto()
+    cmp_inst = auto()
+    fcmp_inst = auto()
+    
+    goto_inst = auto()
+    cmp = auto()
     #floats - why do they have a special category  idk 
     fadd_inst = auto()
     fsub_inst = auto()
@@ -61,6 +70,7 @@ class TokenKind(Enum):
     meta_info = auto()
     global_ident = auto()
     local_ident = auto()
+    label_ident = auto()
     eof = auto()
 
     #operators

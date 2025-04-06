@@ -1,0 +1,4 @@
+
+extern @GetStdHandle(i64) -> i64
+extern @WriteFile(i64, ptr, i32, i64, i64) -> void 
+

@@ -1,108 +1,73 @@
-%macro .l_saveregs 0  ;save calle reg 
-    mov qword [rbp-8], rbx
-    mov qword [rbp-16], r12
-    mov qword [rbp-24], r13
-    mov qword [rbp-32], r14
-    mov qword [rbp-40], r15
+%macro .saveregs 0  ;save calle reg 
+    mov [reg_storage + 0],  rax
+    mov [reg_storage + 8],  rbx
+    mov [reg_storage + 16], rcx
+    mov [reg_storage + 24], rdx
+    mov [reg_storage + 32], rsi
+    mov [reg_storage + 40], rdi
+    mov [reg_storage + 48], rbp
+    mov [reg_storage + 56], rsp
+    mov [reg_storage + 64], r8
+    mov [reg_storage + 72], r9
+    mov [reg_storage + 80], r10
+    mov [reg_storage + 88], r11
+    mov [reg_storage + 96], r12
+    mov [reg_storage + 104], r13
+    mov [reg_storage + 112], r14
+    mov [reg_storage + 120], r15
+
+    movsd [xmm_storage + 0],   xmm0
+    movsd [xmm_storage + 8],   xmm1
+    movsd [xmm_storage + 16],  xmm2
+    movsd [xmm_storage + 24],  xmm3
+    movsd [xmm_storage + 32],  xmm4
+    movsd [xmm_storage + 40],  xmm5
+    movsd [xmm_storage + 48],  xmm6
+    movsd [xmm_storage + 56],  xmm7
+    movsd [xmm_storage + 64],  xmm8
+    movsd [xmm_storage + 72],  xmm9
+    movsd [xmm_storage + 80],  xmm10
+    movsd [xmm_storage + 88],  xmm11
+    movsd [xmm_storage + 96],  xmm12
+    movsd [xmm_storage + 104], xmm13
+    movsd [xmm_storage + 112], xmm14
+    movsd [xmm_storage + 120], xmm15
 %endmacro 
 
-%macro .l_dropregs 0 ;save calle reg 
-    mov rbx, qword [rbp-8]
-    mov r12, qword [rbp-16]
-    mov r13, qword [rbp-24]
-    mov r14, qword [rbp-32]
-    mov r15, qword [rbp-40]
-%endmacro
+%macro .dropregs 0 ;save calle reg 
+    movsd xmm0,  [xmm_storage + 0]
+    movsd xmm1,  [xmm_storage + 8]
+    movsd xmm2,  [xmm_storage + 16]
+    movsd xmm3,  [xmm_storage + 24]
+    movsd xmm4,  [xmm_storage + 32]
+    movsd xmm5,  [xmm_storage + 40]
+    movsd xmm6,  [xmm_storage + 48]
+    movsd xmm7,  [xmm_storage + 56]
+    movsd xmm8,  [xmm_storage + 64]
+    movsd xmm9,  [xmm_storage + 72]
+    movsd xmm10, [xmm_storage + 80]
+    movsd xmm11, [xmm_storage + 88]
+    movsd xmm12, [xmm_storage + 96]
+    movsd xmm13, [xmm_storage + 104]
+    movsd xmm14, [xmm_storage + 112]
+    movsd xmm15, [xmm_storage + 120]
 
-%macro .w_saveregs 0 ;save calle reg 
-    mov qword [rbp-8], rbx
-    mov qword [rbp-16], rdi
-    mov qword [rbp-24], r12
-    mov qword [rbp-32], r13
-    mov qword [rbp-40], r14
-    mov qword [rbp-48], r15
-    movsd qword [rbp-56], xmm6
-    movsd qword [rbp-64], xmm7
-    movsd qword [rbp-72], xmm8
-    movsd qword [rbp-80], xmm9
-    movsd qword [rbp-88], xmm10
-    movsd qword [rbp-96], xmm11
-    movsd qword [rbp-104], xmm12
-    movsd qword [rbp-112], xmm13
-    movsd qword [rbp-120], xmm14
-    movsd qword [rbp-128], xmm15
-%endmacro
-
-%macro .w_dropregs 0 ;save calle reg 
-     mov rbx, qword [rbp-8]
-    mov rdi, qword [rbp-16]
-    mov r12, qword [rbp-24]
-    mov r13, qword [rbp-32]
-    mov r14, qword [rbp-40]
-    mov r15, qword [rbp-48]
-    movsd xmm6, qword [rbp-56]
-    movsd xmm7, qword [rbp-64]
-    movsd xmm8, qword [rbp-72]
-    movsd xmm9, qword [rbp-80]
-    movsd xmm10, qword [rbp-88]
-    movsd xmm11, qword [rbp-96]
-    movsd xmm12, qword [rbp-104]
-    movsd xmm13, qword [rbp-112]
-    movsd xmm14, qword [rbp-120]
-    movsd xmm15, qword [rbp-128]
-%endmacro 
-%macro .l_startcall 1
-    mov qword rax, [rbp - %1]
-    mov qword rcx, [rbp - %1 + 8]
-    mov qword rdx, [rbp - %1 + 16]
-    mov qword rsi, [rbp - %1 + 24]
-    mov qword rdi, [rbp - %1 + 32]
-    mov qword r10, [rbp - %1 + 40]
-    mov qword r11, [rbp - %1 + 48]
-
-    movsd xmm8, [rbp - %1 + 56]  
-    movsd xmm9, [rbp - %1 + 64]
-    movsd xmm10, [rbp - %1 + 72]
-    movsd xmm11, [rbp - %1 + 80]
-    movsd xmm12, [rbp - %1 + 88]
-    movsd xmm13, [rbp - %1 + 96]
-    movsd xmm14, [rbp - %1 + 104]
-    movsd xmm15, [rbp - %1 + 112]
-%endmacro 
-
-%macro .l_endcall 1 
-    mov qword [rbp - %1], rax
-    mov qword [rbp - %1 + 8], rcx
-    mov qword [rbp - %1 + 16], rdx
-    mov qword [rbp - %1 + 24], rsi
-    mov qword [rbp - %1 + 32], rdi
-    mov qword [rbp - %1 + 40], r10
-    mov qword [rbp - %1 + 48], r11 
-
-    movsd [rbp - %1 + 56], xmm8  
-    movsd [rbp - %1 + 64], xmm9
-    movsd [rbp - %1 + 72], xmm10
-    movsd [rbp - %1 + 80], xmm11
-    movsd [rbp - %1 + 88], xmm12
-    movsd [rbp - %1 + 96], xmm13
-    movsd [rbp - %1 + 104], xmm14
-    movsd [rbp - %1 + 112], xmm15
-%endmacro  
-
-%macro .w_startcall 1
-    mov qword [rbp - %1 + 8], r10
-    mov qword [rbp - %1 + 16], r11
-
-    movsd [rbp - %1 + 24], xmm4
-    movsd [rbp - %1 + 32], xmm5 
-%endmacro
- 
-%macro .w_endcall 1
-    mov qword r10, [rbp - %1 + 8] 
-    mov qword r11, [rbp - %1 + 16]  
-    
-    movsd xmm4, [rbp - %1 + 24]
-    movsd xmm5, [rbp - %1 + 32] 
-
+    ; --- Restore GPRs ---
+    mov rax, [reg_storage + 0]
+    mov rbx, [reg_storage + 8]
+    mov rcx, [reg_storage + 16]
+    mov rdx, [reg_storage + 24]
+    mov rsi, [reg_storage + 32]
+    mov rdi, [reg_storage + 40]
+    mov rbp, [reg_storage + 48]
+    mov rsp, [reg_storage + 56]
+    mov r8,  [reg_storage + 64]
+    mov r9,  [reg_storage + 72]
+    mov r10, [reg_storage + 80]
+    mov r11, [reg_storage + 88]
+    mov r12, [reg_storage + 96]
+    mov r13, [reg_storage + 104]
+    mov r14, [reg_storage + 112]
+    mov r15, [reg_storage + 120]
 %endmacro
 

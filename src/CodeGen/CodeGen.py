@@ -31,7 +31,7 @@ class Env:
         elif self.VReg.get(Name) != None:
             self.VReg.pop(Name)
 class CodeGen:
-    def __init__(self, Ast: dict, plat: str):
+    def __init__(self, Ast: dict, Meta: dict, plat: str):
         self.Ast: dict = Ast
         self.Env: Env = Env()
         self.EnvList: list[Env] = []
@@ -40,9 +40,8 @@ class CodeGen:
     
         self.lastcall = None
         
-        self.FuncLocal = {
+        self.FuncLocal = Meta['Funcs']
 
-        }
         self.Nums: int = 0
         self.Pos: int  = 0
         self.Info = {
@@ -109,7 +108,7 @@ class CodeGen:
         
         self.RoData: list[str] = ["section .rodata"]
         self.Data: list[str] = ["section .data"] 
-        self.Bss: list[str] = ["section .bss"]
+        self.Bss: list[str] = ["section .bss", "\treg_storage resq 16", "\txmm_storage resq 16"]
 
     def aling16(self, num: int):
         if num == 0:
@@ -164,12 +163,8 @@ class CodeGen:
         self.Text.append(f"\tmov rbp, rsp")
         self.Text.append(f"\t----Space--")
         self.space = len(self.Text)
-        self.Text.append(f"\t.{'w' if self.plat == 'Windows' else 'l'}_saveregs")
-        
-        self.Info['AllocSpace'] = 128 if self.plat == "Windows" else 48
-        self.lastcall = None
+        self.Text.append(f"\t.saveregs")
 
-        
         if self.plat == "Linux":
             args_reg_int = {
                 "1" : "rdi",
@@ -942,7 +937,7 @@ class CodeGen:
             self.ReturnReserve("rax", "64")
            
         if self.Info['Higest'] < self.Info['AllocSpace']: self.Info['Higest'] = self.Info['AllocSpace']
-        self.Text.append(f"\t.{'w' if self.plat == 'Windows' else 'l'}_dropregs")
+        self.Text.append(f"\t.dropregs")
         self.Text.append(f"\tmov rsp, rbp")
         self.Text.append(f"\tpop rbp")
         self.Text.append(f"\tret")
@@ -1459,7 +1454,7 @@ class CodeGen:
                 self.IntSizes = "64"
                 val = self.GenNode(Node['Pos'])
                 
-                self.Text.append(f"\tlea {reg}, [{vareg}-{int(Var['Type']['To']['Size']) // 8} + {val} * 4]")
+                self.Text.append(f"\tlea {reg}, [{vareg}-{int(Var['Type']['To']['Size']) // 8} + {val} * {int(Var['Type']['To']['Size']) // 8}]")
      
            
             self.Env.AddVar(Node['Name'],{
@@ -1574,17 +1569,14 @@ class CodeGen:
             Code+=f"{Node['Value']}, "
         if Node['Kind'] == "FloatSizes":
             Code+=f"{Node['Value']}, "
-
-
+        if Node['Kind'] == 'GIdent':
+            if Node['Name'][-1] == ":":
+                Code+=f"{Node['Name'][1:-1]}, "
+            else: 
+                Code+=f"{Node['Name'][1:]}, "
         return Code 
     def GenCall(self, Node):    
         if self.plat == "Linux":  
-            if self.lastcall == None:
-                self.lastcall = self.Info['AllocSpace']
-                self.Info['AllocSpace']+=120 
-            if self.lastcall != None:
-                self.Text.append(f"\t.l_startcall {self.lastcall}") 
-
             args_reg_int = {
                 "1" : "rdi",
                 "2" : "rsi",
@@ -1601,6 +1593,7 @@ class CodeGen:
             self.ReserveReg("rcx", "64")
             self.ReserveReg("r8", "64")
             self.ReserveReg("r9", "64")
+
             args_reg_float = {
                 "0" : "xmm0",
                 "1" : "xmm1",
@@ -1699,13 +1692,21 @@ class CodeGen:
                         val = self.GenNode(i['Value'])
                         self.Text.append(f"\tmov qword {args_reg_int[str(intcount)]}, {val}")
                         intcount+=1 
-
-            if self.FuncLocal[Node['Name']] == True:
-                self.Text.append(f"\tcall {Node['Name'][1:]}")
+        
+            if Node['Name'][0] == "@":
+                if self.FuncLocal.get(Node['Name']) == True:
+                    self.Text.append(f"\tcall {Node['Name'][1:]}")
+                else:
+                    self.Text.append(f"\tcall {Node['Name'][1:]} wrt ..plt")
             else:
-                self.Text.append(f"\tcall {Node['Name'][1:]} wrt ..plt")
+                Val = self.GenLocalIdent({
+                    "Kind" : "LIdent",
+                    "Name" : Node['Name'],
+                })
+
+                self.Text.append(f"\tcall {Val}")
+
             self.Text.append(f"\tadd rsp, {self.aling16(len(floop) * 8)}")
-            self.Text.append(f"\t.l_endcall {self.lastcall}")
 
             if Node['RetType']['Kind'] == "Primitive":
                 if Node['RetType']['Val'][0] == "i":
@@ -1766,12 +1767,7 @@ class CodeGen:
                 
                 
         elif self.plat == "Windows":
-            if self.lastcall == None:
-                self.lastcall = self.Info['AllocSpace']
-                self.Info['AllocSpace']+=40  
-            if self.lastcall != None:
-                self.Text.append(f"\t.w_startcall {self.lastcall}") 
-            
+           
             args_reg_int = {
                 "0" : "rcx",
                 "1" : "rdx",
@@ -1853,9 +1849,18 @@ class CodeGen:
                 argscount+=1 
 
             self.Text[allocpos - 1] = f"\tsub rsp, {stackpos}"
-            self.Text.append(f"\tcall {Node['Name'][1:]}")
+            
+            if Node['Name'][0] == "@":
+                self.Text.append(f"\tcall {Node['Name'][1:]}")
+            else:
+                Val = self.GenLocalIdent({
+                    "Kind" : "LIdent",
+                    "Name" : Node['Name'],
+                })
+
+                self.Text.append(f"\tcall {Val}")
+
             self.Text.append(f"\tadd rsp, {stackpos}")
-            self.Text.append(f"\t.w_endcall {self.lastcall}")
 
            
             if Node['RetType']['Kind'] == "Primitive":
@@ -1913,6 +1918,98 @@ class CodeGen:
     def GenExtern(self, Node):
         self.Text.append(f"extern {Node['Name'][1:]}")
         self.FuncLocal.update({Node['Name'] : False})    
+    
+    def GenFPtr(self, Node):
+        reg = self.GetReg("64")
+        self.Text.append(f"\tlea {reg}, {Node['Name'][1:]}")
+        self.Env.AddVar(Node['In'], {
+            "Type" : {
+                "Kind" : "Pointer",
+                "To" : { 
+                    "Kind" : "Primitive",
+                    "Val" : "i64",
+                    "Size" : "64",
+                },
+                "Size" : "64",
+            },
+            "Register" : reg,
+            "MustLoad" : False,
+            "InReg" : True,
+            "Ditch" : False,
+            "Simd" : False,
+        })
+           
+        return reg 
+    def GenGlobalIdent(self, Node):
+        if Node['Name'][-1] == ":":
+            self.Text.append(f"{Node['Name'][1:]}")
+
+
+    def GenCmp(self, Node):
+        size = Node['Type']['Size']
+        self.IntSizes = size 
+        self.FloatSizes = size
+        if Node['inst'] in ["cmp", "icmp"]:
+            op1 = self.GenNode(Node['Op1'])
+            op2 = self.GenNode(Node['Op2'])
+
+            self.Text.append(f"\tcmp {self.ensureload(op1, size)}, {self.ensureload(op2, size)}")
+        else:
+            op1 = self.GenNode(Node['Op1'])
+            op2 = self.GenNode(Node['Op2'])
+
+            self.Text.append(f"\tucomis{self.GetDataSize(size, type_='Simd')} {self.ensureload(op1, size, type_='Simd')}, {self.ensureload(op2, size, type_='Simd')}")
+        
+        reg = self.GetReg("16")
+        reg2 = self.GetReg("16")
+        cmptype = Node['inst']
+        cmpinst = {
+            "eq" : "cmove" if cmptype == "icmp" else "cmovz",
+            "ne" : "cmovne" if cmptype == "icmp" else "cmovnz",
+            "le" : "cmovl" if cmptype == "icmp" else "cmovb",
+            "leoe" : "cmovle" if cmptype == "icmp" else "cmovbe",
+            "gt" : "cmovg" if cmptype == "icmp" else "cmova",
+            "gtoe" : "cmovge" if cmptype == "icmp" else "cmovae"
+        }
+        self.Text.append(f"\tmov word {reg}, 0")
+        self.Text.append(f"\tmov word {reg2}, 1")
+        self.Text.append(f"\t{cmpinst[Node['cmpinst']]} {reg}, {reg2}")
+        
+        self.Env.AddVar(Node['Name'], {
+            "Type" : {
+                "Kind" : "Primitive",
+                "Val" : "i8",
+                "Size" : "8",
+            },
+            "Register" : reg,
+            "MustLoad" : False,
+            "InReg" : True,
+            "Ditch" : False,
+            "Simd" : False,
+        })
+
+    def GenIf(self, Node):
+        self.Text.append(f"\tcmp {self.GenNode(Node['Comp'])}, 1")
+        if Node['Goto'][0] == "@":
+            self.Text.append(f"\tje {Node['Goto'][1:]}")
+        else: 
+            Val = self.GenLocalIdent({
+                "Kind" : "LIdent",
+                "Name" : Node['Goto'],
+            })
+
+            self.Text.append(f"\tje [{Val}]")
+
+    def GenGoto(self, Node):
+        if Node['Name'][0] == "@":
+            self.Text.append(f"\tjmp {Node['Name'][1:]}")
+        else: 
+            Val = self.GenLocalIdent({
+                "Kind" : "LIdent",
+                "Name" : Node['Name'],
+            })
+
+            self.Text.append(f"\tjmp [{Val}]")
     def GenNode(self, Node):
         kind = Node['Kind']
        
@@ -1930,6 +2027,8 @@ class CodeGen:
             self.Text.append(f"\t;{Node.get('Value', '')}")
         elif kind == "LoadPtrNode":
             return self.GenLoadPtrNode(Node)
+        elif kind == "GetFPtr":
+            return self.GenFPtr(Node) 
         elif kind == "BinNode":
             return self.GenBin(Node)
         elif kind == "IntToFloat":
@@ -1946,8 +2045,16 @@ class CodeGen:
             return self.GenLoad(Node)
         elif kind == "LIdent":
             return self.GenLocalIdent(Node)
+        elif kind == "GIdent":
+            return self.GenGlobalIdent(Node)
         elif kind == "RetNode":
             return self.GenRet(Node)
+        elif kind == "cmp":
+            return self.GenCmp(Node)
+        elif kind == "IfStmt":
+            return self.GenIf(Node)
+        elif kind == "Goto":
+            return self.GenGoto(Node)
         elif kind == "Block":
             for i in Node['Body']:
                 self.GenNode(i)

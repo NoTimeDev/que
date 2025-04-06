@@ -51,8 +51,9 @@ def main(argv: list[str] = sys.argv, argc: list[str] = len(sys.argv)):
             if ErrorClass.meterr == True:
                 printr(ErrorClass.err)
                 exit(1)
-        print(json.dumps(Ast, indent=4))
-        CodeGenClass: CodeGen = CodeGen(Ast, platform_)
+        if("-dump" in argv):
+            print(json.dumps(Ast, indent=4))
+        CodeGenClass: CodeGen = CodeGen(Ast, Parser_Class.Meta, platform_,)
         Cont = CodeGenClass.Gen()
         
         Name = "out"
@@ -64,7 +65,7 @@ def main(argv: list[str] = sys.argv, argc: list[str] = len(sys.argv)):
 
 
         if "-plat=win" in argv:
-            subprocess.run(["wine", "nasm", Name + ".asm", "-o", Name + ".o","-f", "elf64"])      
+            subprocess.run(["wine", "nasm", Name + ".asm", "-o", Name + ".o","-f", "win64"])      
             subprocess.run(["x86_64-w64-mingw32-ld", Name + ".o", "-o", Name +".exe", '-I"/home/devvy/.wine/drive_c/windows/system32"', "-lkernel32"] + Ast["Meta"]["LinkerFlags"]) 
         else:
             subprocess.run(["nasm", Name + ".asm", "-o", Name + ".o","-f", "elf64"])      

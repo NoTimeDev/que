@@ -10,7 +10,10 @@ class Parser:
 
         self.plat: str = plat 
         self.include_table: list[str] = []
-
+        
+        self.Meta: dict = {
+            "Funcs" : {}
+        }
         self.MacTbl: list = []
 
         self.Ast: dict = {
@@ -60,6 +63,8 @@ class Parser:
             return self.ParseExtern()
         elif self.CToken().Kind == TokenKind.global_inst:
             return self.ParseGlobal()
+        elif self.CToken().Kind == TokenKind.getfptr_inst:
+            return self.ParseGetFPtr()
         elif self.CToken().Kind == TokenKind.geteptr_inst:
             return self.ParseGetEptr()
         elif self.CToken().Kind == TokenKind.getptr_inst:
@@ -80,6 +85,10 @@ class Parser:
             return self.ParseRet()
         elif self.CToken().Kind == TokenKind.call_inst:
             return self.ParseCall()
+        elif self.CToken().Kind == TokenKind.goto_inst:
+            return self.ParseGoto()
+        elif self.CToken().Kind == TokenKind.if_inst:
+            return self.ParseIf()
         elif self.CToken().Kind == TokenKind.const_inst:
             self.isconst = True
             self.Advance()
@@ -91,11 +100,52 @@ class Parser:
         
         else:
             return self.ParseExpr()
-  
+ 
+    def ParseGoto(self) -> dict:
+        self.Advance()
+        if self.CToken().Kind == TokenKind.local_ident:
+            Name = self.Advance()
+        else:
+            Name = self.Expect(TokenKind.global_ident, "a global identifier")
+
+        return {
+            "Kind" : "Goto",
+            "Name" : Name.Value,
+        }
+    def ParseIf(self) -> dict:
+        self.Advance()
+        comp = self.ParseStmt()
+        self.Expect(TokenKind.comma, ",")
+        if self.CToken().Kind == TokenKind.local_ident:
+            Name = self.Advance()
+        else:
+            Name = self.Expect(TokenKind.global_ident, "a global identifier")
+        return {
+            "Kind" : "IfStmt",
+            "Comp" : comp,
+            "Goto" : Name.Value,
+        }
+    def ParseGetFPtr(self) -> dict:
+        self.Advance()
+
+        Name = self.Expect(TokenKind.global_ident, "a func name")
+        self.Expect(TokenKind.arrow, "->")
+        In = self.Expect(TokenKind.local_ident, "a local identifier")
+
+        return {
+            "Kind" : "GetFPtr",
+            "Name" : Name.Value,
+            "In" : In.Value,
+        }  
+
     def ParseCall(self) -> dict:
         self.Advance()
+       
+        if self.CToken().Kind == TokenKind.local_ident:
+            Name = self.Advance()
+        else:
+            Name = self.Expect(TokenKind.global_ident, "a global name")
         
-        Name = self.Expect(TokenKind.global_ident, "a global name")
         self.Expect(TokenKind.open_paren, "(")
         Args = []
         while self.CToken().Kind not in [TokenKind.close_paren, TokenKind.eof]:
@@ -419,6 +469,8 @@ class Parser:
         self.Advance()
         Name = self.Expect(TokenKind.global_ident, "function name")
         
+        self.Meta['Funcs'].update({Name.Value : True})
+
         Args = []
         self.Expect(TokenKind.open_paren, '(') 
         while self.CToken().Kind not in [TokenKind.close_paren, TokenKind.eof]:
@@ -714,8 +766,13 @@ class Parser:
     def ParseIdent(self) -> dict:
         Name = self.Advance()
 
+        if Name.Value[0] == "@":
+            Kind = "GIdent"
+        else:
+            Kind = "LIdent"
+        
         return {
-            "Kind" : "LIdent" if Name.Value[0] == "$" else "GIdent",
+            "Kind" : Kind,
             "Name" : Name.Value,
             "Loc" : {
                 "Start" :Name.Start,
@@ -824,6 +881,27 @@ class Parser:
             "Size" : len(List),
             "List" : List,
         }
+    
+    def ParseCmp(self) -> dict:
+        tk = self.Advance()
+
+        Type = self.ParseType()
+        cmpinst = self.Expect(TokenKind.cmp, "a compare inst")
+        Op1 = self.ParseStmt()
+        self.Expect(TokenKind.comma, ",")
+        Op2 = self.ParseStmt()
+        self.Expect(TokenKind.arrow, "->")
+        Name = self.Expect(TokenKind.local_ident, "a local identifier")
+
+        return {
+            "Kind" : "cmp", 
+            "inst" : tk.Value,
+            "Type" : Type, 
+            "cmpinst" : cmpinst.Value,
+            "Op1" : Op1,
+            "Op2" : Op2, 
+            "Name" : Name.Value,
+        }
 
     def ParseExpr(self) -> dict:
         tk = self.CToken() 
@@ -850,14 +928,16 @@ class Parser:
                 TokenKind.trunc_inst
             ]:
             return self.ParseSizech()
-        elif tk.Kind in [TokenKind.local_ident, TokenKind.global_ident]:
+        elif tk.Kind in [TokenKind.local_ident, TokenKind.global_ident, TokenKind.label_ident]:
             return self.ParseIdent()
         elif tk.Kind == TokenKind.int_const:
             return self.ParseInt()
         elif tk.Kind == TokenKind.float_const:
             return self.ParseFloat() 
         elif tk.Kind == TokenKind.comment:
-            return self.Parsecomment()
+            return self.Parsecomment() 
+        elif tk.Kind in [TokenKind.cmp_inst, TokenKind.icmp_inst, TokenKind.fcmp_inst]:
+            return self.ParseCmp()
         else:
             self.errcls.throwerr(tk.Line, tk.Start, tk.End, "expected an expression")
             self.Advance()

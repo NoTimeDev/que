@@ -1,12 +1,15 @@
-function pointer - [
-
+If  - [
+    jmp,
+    cmps,
+    if, 
 ]
 
 bit wise  ops - [
 
 ]
 
-If  - [
+
+vardic args - [
 
 ]
 
