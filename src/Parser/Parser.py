@@ -12,7 +12,8 @@ class Parser:
         self.include_table: list[str] = []
         
         self.Meta: dict = {
-            "Funcs" : {}
+            "Funcs" : {},
+            "Structs" : {}
         }
         self.MacTbl: list = []
 
@@ -59,6 +60,8 @@ class Parser:
     def ParseStmt(self) -> dict:
         if self.CToken().Kind == TokenKind.def_inst:
             return self.ParseFunc()
+        elif self.CToken().Kind == TokenKind.getseptr_inst:
+            return self.ParseGetSEPtr()
         elif self.CToken().Kind == TokenKind.extern_inst:
             return self.ParseExtern()
         elif self.CToken().Kind == TokenKind.global_inst:
@@ -69,6 +72,8 @@ class Parser:
             return self.ParseGetEptr()
         elif self.CToken().Kind == TokenKind.getptr_inst:
             return self.ParseGetPtr()
+        elif self.CToken().Kind == TokenKind.cast_inst:
+            return self.ParseCast()
         elif self.CToken().Kind == TokenKind.store_inst:
             return self.ParseStore()
         elif self.CToken().Kind == TokenKind.castptr_inst:
@@ -81,6 +86,8 @@ class Parser:
             return self.ParseLoad()
         elif self.CToken().Kind in [TokenKind.fti_inst, TokenKind.itf_inst]:
             return self.Parsetoint() 
+        elif self.CToken().Kind == TokenKind.struct_inst:
+            return self.ParseStruct()
         elif self.CToken().Kind == TokenKind.ret_inst:
             return self.ParseRet()
         elif self.CToken().Kind == TokenKind.call_inst:
@@ -100,7 +107,69 @@ class Parser:
         
         else:
             return self.ParseExpr()
- 
+    
+    def ParseGetSEPtr(self) -> dict:
+        tk = self.Advance()
+        
+        if self.CToken().Kind == TokenKind.pointer:
+            self.Advance()
+            Point = True 
+        else:
+            Point = False
+        
+        Name = self.Expect(TokenKind.local_ident, "a structure variable")
+        Struct_Type = self.ParseType()
+        self.Expect(TokenKind.comma, ",")
+        pos = self.Expect(TokenKind.int_const, "an int")
+        Type = self.ParseType()
+        self.Expect(TokenKind.arrow, "->")
+        ELName = self.Expect(TokenKind.local_ident, "an identifier")
+
+        return {
+            "Kind" : "GetSePtr",
+            "Point" : Point,
+            "Struct_Var" : Name.Value,
+            "Pos" : pos.Value,
+            "Struct_Type" : Struct_Type,
+            "Type" : Type,
+            "Name" : ELName.Value,
+        }
+
+        self.Advance()
+        
+    def ParseStruct(self) -> dict:
+        self.Advance()
+        Name = self.Expect(TokenKind.global_ident, "a global identifier")
+        
+        self.Expect(TokenKind.open_brace, "{")
+        Args = []
+        sSize = 0
+        while self.CToken().Kind not in [TokenKind.close_brace,TokenKind.eof]:
+            #these two cases should not happen but NoTimeDev is a shitty programmer so its 
+            #possible it may happen
+            if self.CToken().Kind == TokenKind.close_brace: break
+            elif self.CToken().Kind == TokenKind.eof: break 
+            elif self.CToken().Kind == TokenKind.comma: self.Advance()
+            else:   
+                Type = self.ParseType()
+                self.Expect(TokenKind.arrow, "->")
+                Size = self.Expect(TokenKind.int_const, "a int")
+                sSize+=int(Size.Value)    
+                Args.append({
+                    "Type" : Type,
+                    "Size" : Size.Value,
+                })
+        self.Expect(TokenKind.close_brace, '}')
+
+        struct = {
+            "Kind" : "Structs",
+            "Name" : Name.Value,
+            "Elements" : Args,
+            "Size" : sSize,
+        }
+        self.Meta['Structs'].update({Name.Value : struct})
+        return struct 
+
     def ParseGoto(self) -> dict:
         self.Advance()
         if self.CToken().Kind == TokenKind.local_ident:
@@ -209,7 +278,18 @@ class Parser:
             "RetType" : RetType,
         }
 
-     
+    
+    def ParseCast(self) -> dict:
+        self.Advance()
+        Cast = self.Advance() if self.CToken().Kind == TokenKind.global_ident else self.Expect(TokenKind.local_ident, "a local idetifiers name")
+        self.Expect(TokenKind.comma, ",")
+        Type = self.ParseType()
+
+        return {
+            "Kind" : "Cast",
+            "Name" : Cast.Value,
+            "To" : Type,
+        }
     def ParseCastPtr(self) -> dict:
         tk = self.Advance()
         casting = self.Expect(TokenKind.local_ident, "a local identifier")
@@ -536,7 +616,10 @@ class Parser:
                 "To" : pointingto,
                 "Size" : "64",
             }
-
+        if tk.Kind == TokenKind.type_ and tk.Value == "pad":
+            return {
+                "Kind" : "Pad"
+            }
         if tk.Kind == TokenKind.type_ and tk.Value != "ptr":
             return {
                 "Kind" : "Primitive",
@@ -557,6 +640,12 @@ class Parser:
                 },
                 "Size" : "64",
             } 
+        if tk.Kind == TokenKind.global_ident:
+            return {
+                "Kind" : "Struct",
+                "Name" : tk.Value,
+                "Size" : "1"
+            }
         else:
             self.errcls.throwerr(tk.Line, tk.Start, tk.End, f"expected a type but recived '{tk.Value}'")
         
@@ -846,10 +935,12 @@ class Parser:
 
     def ParseDeref(self) -> dict:
         tk = self.Advance()
+        Type = self.ParseType()
         Name = self.Expect(TokenKind.local_ident, "a local identifier")
 
         return {
             "Kind" : "Dereference",
+            "Type" : Type,
             "Name" : Name.Value,
         }
     def ParseList(self) -> dict:
@@ -881,7 +972,30 @@ class Parser:
             "Size" : len(List),
             "List" : List,
         }
+    def ParseconstStruct(self) -> dict:
+        self.Advance()
+
+        List = []
+        while self.CToken().Kind not in [TokenKind.eof, TokenKind.close_brace]:
+            if self.CToken().Kind == TokenKind.comma:
+                self.Advance()
+            elif self.CToken().Kind == TokenKind.close_brace:
+                break 
+            else:
+                Type = self.ParseType()
+                List.append({
+                        "Type" : Type, 
+                        "Value" : self.ParseStmt()
+                })
+        self.Expect(TokenKind.close_brace, "}")
+
+        return {
+            "Kind" : "Struct_c",
+            "Size" : len(List),
+            "List" : List,
+        }
     
+
     def ParseCmp(self) -> dict:
         tk = self.Advance()
 
@@ -902,6 +1016,24 @@ class Parser:
             "Op2" : Op2, 
             "Name" : Name.Value,
         }
+    
+    def ParseShifts(self) -> dict:
+        inst = self.Advance().Value
+        Type = self.ParseType()
+        Val = self.ParseStmt()
+        self.Expect(TokenKind.comma, ",")
+        Num = self.ParseStmt() 
+        self.Expect(TokenKind.arrow, "->")
+        Name  = self.Expect(TokenKind.local_ident, "a local ident")
+
+        return {
+            "Kind" : "Shift",
+            "Inst" : inst,
+            "Type" : Type,
+            "Val" : Val,
+            "Num" : Num,
+            "Name" : Name.Value,
+        }
 
     def ParseExpr(self) -> dict:
         tk = self.CToken() 
@@ -909,14 +1041,20 @@ class Parser:
             return self.ParseMeta()
         elif tk.Kind == TokenKind.open_bracket:
             return self.ParseList()
+        elif tk.Kind == TokenKind.open_brace:
+            return self.ParseconstStruct()
         elif tk.Kind == TokenKind.pointer:
             return self.ParseDeref()
         elif tk.Kind in [TokenKind.add_inst, TokenKind.sub_inst, 
-                         TokenKind.idiv_inst, TokenKind.div_inst,
-                         TokenKind.imul_inst, TokenKind.mul_inst,
-                         TokenKind.imod_inst, TokenKind.mod_inst
+                        TokenKind.idiv_inst, TokenKind.div_inst,
+                        TokenKind.imul_inst, TokenKind.mul_inst,
+                        TokenKind.imod_inst, TokenKind.mod_inst,
+                         TokenKind.xor_inst, 
+                         TokenKind.or_inst, TokenKind.and_inst,
             ]:
             return self.ParseBin()
+        elif tk.Kind in [TokenKind.shl_inst, TokenKind.shr_inst, TokenKind.ashr_inst]:
+            return self.ParseShifts()
         elif tk.Kind in [TokenKind.fadd_inst, TokenKind.fsub_inst,
                          TokenKind.fmod_inst, TokenKind.fmul_inst,
                          TokenKind.fdiv_inst]:

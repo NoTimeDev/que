@@ -1,54 +1,9 @@
 include "./Lib/std.que"
-include "./Lib/windows.que"
+const global [14]i8, 14 -> @str1 = [!str"Hello, World\n"]
 
-global [4]ptr, 32 -> @switch1_cases = [@switch1_case1, @switch1_case2, @switch1_case3, @switch1_case4]
-global [8]i8, 8 -> @_str1 = [!str"Case 1!\n"]
-global [8]i8, 8 -> @_str2 = [!str"Case 2!\n"]
-global [8]i8, 8 -> @_str3 = [!str"Case 3!\n"]
-global [8]i8, 8 -> @_str4 = [!str"Case 4!\n"]
-global [11]i8, 11 -> @_str5 = [!str"default :(\n"]
-global i32, 4 -> @_casestrwritten 
-
-def @main() -> i32 {
-@entry: 
-    call @GetStdHandle(i64 -11), i64 -> $.hConsole
-    load $.hConsole, i64 -> $.hConsoleload
-    getptr @_casestrwritten, ptr -> $._casestrwritten  
-    load $._casestrwritten, ptr -> $._casestrwrittenl 
-    
-    add i64 1, 2 -> $.1
-    cmp i64 gt $.1, 4 -> $.2   
-    if $.2, @switch1_default
-    getptr @switch1_cases, ptr -> $.localswitchptr 
-    load $.1, i64 -> $.pos
-    geteptr *$.localswitchptr [4]ptr, $.pos ptr -> $.case
-    goto $.case 
-@switch1_case1: 
-    getptr @_str1, ptr -> $.3  
-    load $.3, ptr -> $.4 
-    call @WriteFile(i64 $.hConsoleload, ptr $.4, i32 8, ptr $._casestrwrittenl, i32 0), void
-    goto @end
-@switch1_case2:
-    getptr @_str2, ptr -> $.5   
-    load $.5, ptr -> $.6
-    call @WriteFile(i64 $.hConsoleload, ptr $.6, i32 8, ptr $._casestrwrittenl, i32 0), void
-    goto @end
-@switch1_case3:
-    getptr @_str3, ptr -> $.7  
-    load $.7, ptr -> $.8
-    call @WriteFile(i64 $.hConsoleload, ptr $.8, i32 8, ptr $._casestrwrittenl, i32 0), void
-    goto @end
-@switch1_case4:
-    getptr @_str4, ptr -> $.9  
-    load $.8, ptr -> $.10
-    call @WriteFile(i64 $.hConsoleload, ptr $.10, i32 8, ptr $._casestrwrittenl, i32 0), void
-    goto @end
-@switch1_default: 
-    getptr @_str5, ptr -> $.11  
-    load $.11, ptr -> $.12
-    call @WriteFile(i64 $.hConsoleload, ptr $.12, i32 11, ptr $._casestrwrittenl, i32 0), void
-@end:
+def @main() -> i32{
+    getptr @str1, ptr -> $.ptr1
+    call @SYSCALL(i32 1, i32 1, ptr $.ptr1, i32 14), void
     ret 1, i32 
 }
-
 

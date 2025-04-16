@@ -26,6 +26,15 @@ class TokenKind(Enum):
     imod_inst = auto()
     mod_inst = auto()
     
+    not_inst = auto()
+    and_inst = auto()
+    or_inst = auto()
+    xor_inst = auto()
+    
+    shr_inst = auto()
+    ashr_inst = auto()
+    shl_inst = auto()
+    
     trunc_inst = auto()
     ext_inst = auto()
     iext_inst = auto()
@@ -35,16 +44,18 @@ class TokenKind(Enum):
     getptr_inst = auto()
     geteptr_inst = auto()
     getfptr_inst = auto()
+    getseptr_inst = auto()
     castptr_inst = auto()
-
+    
+    cast_inst = auto()
     global_inst = auto()
     const_inst = auto()
     private_inst = auto()
     extern_inst = auto()
     call_inst = auto()
-
+    struct_inst = auto()
     if_inst = auto()
-
+    
     icmp_inst = auto()
     cmp_inst = auto()
     fcmp_inst = auto()
@@ -87,7 +98,7 @@ class TokenKind(Enum):
     
     open_brace = auto()
     close_brace = auto()
-    
+        
     equal = auto()
 class Token:
     def __init__(self, Value: str, Kind: TokenKind, Line: int, Start: int, End: int):

@@ -164,6 +164,15 @@ class Lexer:
                     "imod" : TokenKind.imod_inst,
                     "mod" : TokenKind.mod_inst,
                     
+                    "xor" : TokenKind.xor_inst,
+                    "or" : TokenKind.or_inst,
+                    "not" : TokenKind.not_inst,
+                    "and" : TokenKind.and_inst,
+                    
+                    "sar" : TokenKind.ashr_inst,
+                    "shr" : TokenKind.shr_inst,
+                    "shl" : TokenKind.shl_inst,
+
                     "trunc" : TokenKind.trunc_inst, 
                     
                     "iext" : TokenKind.iext_inst, 
@@ -176,6 +185,9 @@ class Lexer:
                     
                     "fext" : TokenKind.fext_inst,
                     "ftrunc" : TokenKind.ftrunc_inst,
+
+                    "struct" : TokenKind.struct_inst,
+                    "getseptr" : TokenKind.getseptr_inst,
 
                     "fti" : TokenKind.fti_inst,
                     "itf" : TokenKind.itf_inst,
@@ -206,8 +218,9 @@ class Lexer:
                     "gtoe" : TokenKind.cmp,
                     "eq" : TokenKind.cmp,
                     "ne" : TokenKind.cmp,
+                    "cast" : TokenKind.cast_inst,
 
-
+                    "pad" : TokenKind.type_,
                     "ptr" : TokenKind.type_,
                     "f64" : TokenKind.type_,
                     "f32" : TokenKind.type_,

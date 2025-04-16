@@ -53,7 +53,12 @@ def main(argv: list[str] = sys.argv, argc: list[str] = len(sys.argv)):
                 exit(1)
         if("-dump" in argv):
             print(json.dumps(Ast, indent=4))
-        CodeGenClass: CodeGen = CodeGen(Ast, Parser_Class.Meta, platform_,)
+
+        if "-smac" in argv:
+            smac = argv[argv.index('-smac') + 1]
+        else:
+            smac = ""
+        CodeGenClass: CodeGen = CodeGen(Ast, Parser_Class.Meta, platform_, smac)
         Cont = CodeGenClass.Gen()
         
         Name = "out"
@@ -69,7 +74,7 @@ def main(argv: list[str] = sys.argv, argc: list[str] = len(sys.argv)):
             subprocess.run(["x86_64-w64-mingw32-ld", Name + ".o", "-o", Name +".exe", '-I"/home/devvy/.wine/drive_c/windows/system32"', "-lkernel32"] + Ast["Meta"]["LinkerFlags"]) 
         else:
             subprocess.run(["nasm", Name + ".asm", "-o", Name + ".o","-f", "elf64"])      
-            subprocess.run(["ld", Name + ".o", "-o", Name ] + Ast["Meta"]["LinkerFlags"])
+            subprocess.run(["ld", Name + ".o", "-o", Name + ".exe" if platform_ == "Windows" else Name] + Ast["Meta"]["LinkerFlags"])
            
         if "-clean" in argv:
             os.remove(os.path.abspath(f"./{Name}.asm"))

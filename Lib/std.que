@@ -1,38 +1,55 @@
-
 !if !os "Windows"{
-    !asmtext "extern ExitProcess"
+    include "./Lib/windows.que"
 }
+!if !os "Linux"{
+ include "./Lib/linux.que"
+}
+
+!ldflags ["-e", "start"]
+
 
 def @start() -> i32{
-!ifdef !linkc{
-    !if !os "Linux"{
-        !ldflags ["-dynamic-linker", "/lib64/ld-linux-x86-64.so.2", "-lc"]
-    }
+    call @main(), i32 -> $.1 
+    load $.1, i32 -> $.2 
     !if !os "Windows"{
-    }
-}
-    !ldflags ["-e", "start"]
-    !if !os "Windows"{
-        !asmtext "call main"
-        !asmtext "xor rcx, rcx"
-        !ifdef !main64{!asmtext "mov rcx, rax"}
-        !eifdef !main32{!asmtext "mov ecx, eax"}
-        !eifdef !main16{!asmtext "mov cx, ax"}
-        !eifdef !main8{!asmtext "mov cl, al"}
-        !else{!asmtext "mov ecx, eax"}
-        !asmtext "call ExitProcess"
+        call @ExitProcess(i32 $.2), void 
     }
     !if !os "Linux"{
-        !asmtext "call main"
-        !asmtext "xor rdi, rdi"
-        !ifdef !main64{!asmtext "mov rdi, rax"}
-        !eifdef !main32{!asmtext "mov edi, eax"}
-        !eifdef !main16{!asmtext "mov di, ax"}
-        !eifdef !main8{!asmtext "mov dil, al"}
-        !else{!asmtext "mov edi, eax"}
-        !asmtext "mov rax, 60"
-        !asmtext "syscall"
-        
+        call @SYSCALL(i64 60, i32 $.2), void 
     }
     ret void 
 }
+
+def @memcpy(ptr $src, ptr $dest, i64 $size) -> void {
+    alloc ptr, 8 -> $d
+    load $dest, ptr -> $.s1
+    store ptr $.s1, $d 
+
+    alloc ptr, 8 -> $s 
+    load $src, ptr -> $.s2 
+    store ptr $.s2, $s 
+    goto @loop_cond
+@loop_cond:
+    load $size, i64 -> $.1 
+    icmp i64 ne $size, 0 -> $.3 
+    if $.3, @loop_body 
+    goto @loop_end
+@loop_body:
+    load $size, i64 -> $.9
+    sub i64 $.9, 1 -> $.10 
+    store i64 $.10, $size  
+    
+    load $s, ptr -> $.p1 
+    load $d, ptr -> $.p3 
+    store i8 *i8 $.p1, *$.p3 
+
+    add i64 $.p1, 1 -> $.p2 
+    store i64 $.p2, $s 
+    add i64 $.p3, 1 -> $.p4  
+    store i64 $.p4, $d 
+
+    goto @loop_cond
+@loop_end:
+    ret void 
+}
+

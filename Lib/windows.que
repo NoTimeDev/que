@@ -1,4 +1,3 @@
+!ldflags ["-LC:\Windows\System32", "-lkernel32"]
 
-extern @GetStdHandle(i64) -> i64
-extern @WriteFile(i64, ptr, i32, i64, i64) -> void 
-
+extern @ExitProcess(i32) -> i32 

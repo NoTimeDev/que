@@ -1,12 +1,9 @@
-%macro .saveregs 0  ;save calle reg 
-    mov [reg_storage + 0],  rax
+%macro .saveregs 0 
     mov [reg_storage + 8],  rbx
     mov [reg_storage + 16], rcx
     mov [reg_storage + 24], rdx
     mov [reg_storage + 32], rsi
     mov [reg_storage + 40], rdi
-    mov [reg_storage + 48], rbp
-    mov [reg_storage + 56], rsp
     mov [reg_storage + 64], r8
     mov [reg_storage + 72], r9
     mov [reg_storage + 80], r10
@@ -16,7 +13,6 @@
     mov [reg_storage + 112], r14
     mov [reg_storage + 120], r15
 
-    movsd [xmm_storage + 0],   xmm0
     movsd [xmm_storage + 8],   xmm1
     movsd [xmm_storage + 16],  xmm2
     movsd [xmm_storage + 24],  xmm3
@@ -34,8 +30,9 @@
     movsd [xmm_storage + 120], xmm15
 %endmacro 
 
-%macro .dropregs 0 ;save calle reg 
-    movsd xmm0,  [xmm_storage + 0]
+%macro .dropregs 0  
+
+
     movsd xmm1,  [xmm_storage + 8]
     movsd xmm2,  [xmm_storage + 16]
     movsd xmm3,  [xmm_storage + 24]
@@ -53,14 +50,11 @@
     movsd xmm15, [xmm_storage + 120]
 
     ; --- Restore GPRs ---
-    mov rax, [reg_storage + 0]
     mov rbx, [reg_storage + 8]
     mov rcx, [reg_storage + 16]
     mov rdx, [reg_storage + 24]
     mov rsi, [reg_storage + 32]
     mov rdi, [reg_storage + 40]
-    mov rbp, [reg_storage + 48]
-    mov rsp, [reg_storage + 56]
     mov r8,  [reg_storage + 64]
     mov r9,  [reg_storage + 72]
     mov r10, [reg_storage + 80]
@@ -69,5 +63,4 @@
     mov r13, [reg_storage + 104]
     mov r14, [reg_storage + 112]
     mov r15, [reg_storage + 120]
-%endmacro
-
+%endmacro 
