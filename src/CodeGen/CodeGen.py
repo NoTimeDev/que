@@ -31,9 +31,10 @@ class Env:
         elif self.VReg.get(Name) != None:
             self.VReg.pop(Name)
 class CodeGen:
-    def __init__(self, Ast: dict, Meta: dict, plat: str, mac: str):
+    def __init__(self, Ast: dict, Meta: dict, plat: str, mac: str, CLInfo: dict[str, bool]):
         self.Ast: dict = Ast
         self.Env: Env = Env()
+        self.Genv: Env = self.Env
         self.EnvList: list[Env] = []
         self.space: int = 0
         self.plat: str = plat
@@ -43,6 +44,7 @@ class CodeGen:
         
         self.FuncLocal = Meta['Funcs']
         self.StructLocal = Meta['Structs']
+        self.Global = Meta['global']
         self.InitStructs()
 
         self.Nums: int = 0
@@ -111,8 +113,12 @@ class CodeGen:
         
         self.RoData: list[str] = ["section .rodata"]
         self.Data: list[str] = ["section .data"] 
-        self.Bss: list[str] = ["section .bss", "\treg_storage resq 16", "\txmm_storage resq 16"]
-
+        if CLInfo['-nomain'] == False:
+            self.Bss: list[str] = ["section .bss", "\treg_storage resq 16", "\txmm_storage resq 16"]
+        else:
+            self.Text.append("extern reg_storage")
+            self.Text.append("extern xmm_storage")
+            self.Bss: list[str] = ["section .bss"]
     def aling16(self, num: int):
         if num == 0:
             return 16 
@@ -400,6 +406,18 @@ class CodeGen:
         self.FreeStackSpace = self.FreeStackSpaceList.pop()
         self.Text[self.space - 1] = f"\tsub rsp, {self.aling16(self.Info['Higest'])}"
         self.Info['AllocSpace'] = 0
+    def MarkUse(self, Reg, type_="General"):
+        if type_ == "General":
+            rlist = self.GetRegList(Reg)
+            pos = self.Register['General']['64'].index(rlist[0]) 
+            self.URegister['General']['64'].append(self.Register['General']['64'].pop(pos))
+            self.URegister['General']['32'].append(self.Register['General']['32'].pop(pos))
+            self.URegister['General']['16'].append(self.Register['General']['16'].pop(pos))
+            self.URegister['General']['8'].append(self.Register['General']['8'].pop(pos))
+        else:
+            pos = self.Register['Simd'].index(Reg)
+            self.URegister['Simd'].append(self.Register['Simd'].pop(pos))
+
     def GenBin(self, Node):
         Inst = Node['inst']
 
@@ -410,12 +428,11 @@ class CodeGen:
 
                 Num = Node['Left']['Value']
 
-                Right = self.ensureload(self.GenNode(Node['Right']), size)
+                Right = self.GenNode(Node['Right'])
                 reg = self.GetReg(size)
                 self.Text.append(f"\tmov {self.GetDataSize(size)} {reg}, {Right}")
                 self.Text.append(f"\tadd {self.GetDataSize(size)} {reg}, {Num}\n")
     
-                self.DitchReg(size, reg)
                 self.VarWithRegName.append(Node['Name'])
                 self.Env.AddVar(Node['Name'], {
                     "Type" : Node['Type'],
@@ -430,12 +447,11 @@ class CodeGen:
             elif Node['Right']['Kind'] == "Integer":
                 Num = Node['Right']['Value']
 
-                Left = self.ensureload(self.GenNode(Node['Left']), size)
+                Left = self.GenNode(Node['Left'])
                 reg = self.GetReg(size)
                 self.Text.append(f"\tmov {self.GetDataSize(size)} {reg}, {Left}")
                 self.Text.append(f"\tadd {self.GetDataSize(size)} {reg}, {Num}\n")
-                 
-                self.DitchReg(size, reg)
+                
                 self.VarWithRegName.append(Node['Name'])
                 self.Env.AddVar(Node['Name'], {
                     "Type" : Node['Type'],
@@ -449,8 +465,8 @@ class CodeGen:
                 return reg 
             else:
                
-                Left = self.ensureload(self.GenNode(Node['Left']), size)
-                Right = self.ensureload(self.GenNode(Node['Right']), size)
+                Left = self.GenNode(Node['Left'])
+                Right = self.GenNode(Node['Right'])
                 reg = self.GetReg(size)
                 self.Text.append(f"\tmov {self.GetDataSize(size)} {reg}, {Left}")
                 self.Text.append(f"\tadd {self.GetDataSize(size)} {reg}, {Right}\n")
@@ -468,7 +484,7 @@ class CodeGen:
                 return reg 
         elif Inst == "sub":
             if Node['Right']['Kind'] == "Integer":
-                Left = self.ensureload(self.GenNode(Node['Left']), size)
+                Left = self.GenNode(Node['Left'])
                 reg = self.GetReg(size)
                 self.Text.append(f"\tmov {self.GetDataSize(size)} {reg}, {Left}") 
                 self.Text.append(f"\tsub {self.GetDataSize(size)} {reg}, {Node['Right']['Value']}\n")
@@ -486,8 +502,8 @@ class CodeGen:
                 return reg 
             else:
                 reg = self.GetReg(size) 
-                Right = self.ensureload(self.GenNode(Node['Right']), size)
-                Left = self.ensureload(self.GenNode(Node['Left']), size)
+                Right = self.GenNode(Node['Right'])
+                Left = self.GenNode(Node['Left'])
                 self.Text.append(f"\tmov {self.GetDataSize(size)} {reg}, {Left}") 
                 self.Text.append(f"\tsub {self.GetDataSize(size)} {reg}, {Right}\n")
                 
@@ -505,11 +521,9 @@ class CodeGen:
             self.ReserveReg('rax', '64')
             self.ReserveReg('rdx', '64')
             
-            Left = self.ensureload(self.GenNode(Node['Left']), size)
+            Left = self.GenNode(Node['Left'])
             self.Text.append(f"\tmov {self.GetDataSize(size)} {self.GetSizeOfReg(size, 'rax')}, {Left}")
-            self.ReserveReg(Left, size)
-            self.ReturnReserve(Left, size)
-            Right = self.ensureload(self.GenNode(Node['Right']), size)
+            Right = self.GenNode(Node['Right'])
             if Inst == "mod":
                 self.Text.append(f"\tdiv {Right}")
             elif Inst == "imod":
@@ -519,6 +533,7 @@ class CodeGen:
             self.ReturnReserve('rax', '64')
             self.ReturnReserve('rdx', '64')
             
+            self.MarkUse('rax')
             self.VarWithRegName.append(Node['Name'])
             self.Env.AddVar(Node['Name'], {
                 "Type" : Node['Type'],
@@ -534,8 +549,8 @@ class CodeGen:
             op2 = self.GenNode(Node['Right'])
 
             reg = self.GetReg(Node['Type']['Size'])
-            self.Text.append(f"\tmov {self.GetDataSize(Node['Type']['Size'])} {reg}, {self.ensureload(op1, Node['Type']['Size'])}")
-            self.Text.append(f"\t{Inst} {reg}, {self.ensureload(op2, Node['Type']['Size'])}")
+            self.Text.append(f"\tmov {self.GetDataSize(Node['Type']['Size'])} {reg}, {op1}")
+            self.Text.append(f"\t{Inst} {reg}, {op2}")
             
             self.VarWithRegName.append(Node['Name'])
             self.Env.AddVar(Node['Name'], {
@@ -756,9 +771,9 @@ class CodeGen:
                 if Node['Pointer'] == False:
                     self.Text.append(f"\tmov {self.GetDataSize(Node['Type']['Size'])} {reg}, {Var['Register']}") #type: ignore[]
                 else:
-                    regy = self.ensureload(Var['Register'], "64") #type: ignore[]
+                    regy = Var['Register'] #type: ignore[]
                     self.Text.append(f"\tmov {self.GetDataSize(Node['Type']['Size'])} {reg}, [{regy}]")
-                    
+                     
                 self.Env.AddVar(Node['Into'], {
                     "Type" : Node['Type'],
                     "Register" : reg,
@@ -776,7 +791,7 @@ class CodeGen:
                 if Node['Pointer'] == False:
                     self.Text.append(f"\tmovs{self.GetDataSize(Node['Type']['Size'], type_='Simd')} {reg}, {Var['Register']}") #type: ignore[]
                 else:
-                    regy = self.ensureload(Var['Register'], "64") #type: ignore[]
+                    regy = Var['Register'] #type: ignore[]
                     self.Text.append(f"\tmovs{self.GetDataSize(Node['Type']['Size'], type_='Simd')} {reg}, [{regy}]")
 
                 self.VarWithRegName_Simd.append(Node['Into'])
@@ -791,7 +806,7 @@ class CodeGen:
         elif Node['Type']['Kind'] == "Pointer":
             var = self.Env.GetVar(Node['Loading'])
             reg = self.GetReg(Node['Type']['Size'])
-            ptr = self.ensureload(var['Register'], "64")
+            ptr = var['Register']
             
             if Node['Pointer'] == False:
                 self.Text.append(f"\tmov {self.GetDataSize(Node['Type']['Size'])} {reg}, {ptr}")
@@ -1378,7 +1393,7 @@ class CodeGen:
             
            
             if typeval[0] == "f":
-                Val = self.ensureload(self.GenNode(Node['Val']), typeval[1:], type_="Simd")
+                Val = self.GenNode(Node['Val'])
                 reg = self.GetReg(typeval[1:], type_="Simd")
                 self.Text.append(f";-\n\tmovs{self.GetDataSize(typeval[1:], type_='Simd')} {reg}, {Val}")
                 if Node['Point'] ==False:
@@ -1386,7 +1401,7 @@ class CodeGen:
                 else:
                     self.Text.append(f"\tmovs{self.GetDataSize(typeval[1:], type_='Simd')} [{Var['Register']}], {reg}")
             else:
-                Val = self.ensureload(self.GenNode(Node['Val']), typeval[1:])
+                Val = self.GenNode(Node['Val'])
                 reg = self.GetReg(typeval[1:])
                 self.Text.append(f"\tmov {self.GetDataSize(typeval[1:])} {reg}, {Val}")
                 if Node['Point'] == False:
@@ -1417,7 +1432,7 @@ class CodeGen:
                 self.VarWithRegName.append(Node['Name'])
         elif Node['To'][0] == "@":
             if Node['Type']['To']['Kind'] in ['Primitive', "Pointer", "List"]:
-                self.Text.append(f"\tlea {reg}, [{self.Env.GetVar(Node['To'])['Register']}]")
+                self.Text.append(f"\tlea {reg}, [{Node['To'][1:]}]")
                 self.Env.AddVar(Node['Name'], {
                     "Type" : Node['Type'],
                     "Register" : reg,
@@ -1433,10 +1448,7 @@ class CodeGen:
         if Node['Type']['Kind'] == "Primitive":
             if Node['Type']['Val'][0] == "f":
                 reg = self.GetReg(Node['Type']['Size'], type_="Simd")
-                if var['InReg'] == False:
-                    ptr = self.ensureload(var['Register'], "64")
-                else:
-                    ptr = var['Register']
+                ptr = var['Register']
                     
                 self.Text.append(f"\tmovs{self.GetDataSize(Node['Type']['Size'], type_='Simd')} {reg}, [{ptr}]")
                 self.Env.AddVar(Node['Into'], {
@@ -1451,7 +1463,7 @@ class CodeGen:
             else:
                 reg = self.GetReg(Node['Type']['Size'])
                 if var['InReg'] == False:
-                    ptr = self.ensureload(var['Register'], "64")
+                    ptr = var['Register']
                 else:
                     ptr = var['Register']
                     
@@ -1469,7 +1481,7 @@ class CodeGen:
         elif Node['Type'] == "Pointer":
             reg = self.GetReg(Node['Type']['Size'])
             if var['InReg'] == False:
-                ptr = self.ensureload(var['Register'], "64")
+                ptr = var['Register']
             else:
                 ptr = var['Register']
                     
@@ -1490,10 +1502,10 @@ class CodeGen:
         
         if Var['Simd'] == False:
             reg = self.GetReg(size)
-            self.Text.append(f"\tmov {self.GetDataSize(size)} {reg}, [{self.ensureload(Var['Register'], '64')}]")
+            self.Text.append(f"\tmov {self.GetDataSize(size)} {reg}, [{Var['Register']}]")
         else:
             reg = self.GetReg(size, type_='Simd')
-            self.Text.append(f"\tmovs{self.GetDataSize(size, type_='Simd')} {reg}, [{self.ensureload(Var['Register'], '64')}]")
+            self.Text.append(f"\tmovs{self.GetDataSize(size, type_='Simd')} {reg}, [{Var['Register']}]")
         return reg 
     def GenEPtrNode(self, Node):
         self.IntSizes = "64"
@@ -1506,7 +1518,7 @@ class CodeGen:
             self.Text.append(f"\tlea {adr}, {Var['Register']}")
         self.protectreg(adr, "64")
 
-        posreg = self.ensureload(self.GenNode(Node['Pos']), '64')
+        posreg = self.GenNode(Node['Pos'])
         self.Text.append(f"\timul {posreg}, {int(Var['Type']['Of']['Size']) // 8}") 
         
         reg = self.GetReg('64')
@@ -1986,7 +1998,7 @@ class CodeGen:
     def GenGlobalIdent(self, Node):
         if Node['Name'][-1] == ":":
             self.Text.append(f"{Node['Name'][1:]}")
-
+            
 
     def GenCmp(self, Node):
         size = Node['Type']['Size']
@@ -1996,12 +2008,12 @@ class CodeGen:
             op1 = self.GenNode(Node['Op1'])
             op2 = self.GenNode(Node['Op2'])
 
-            self.Text.append(f"\tcmp {self.ensureload(op1, size)}, {self.ensureload(op2, size)}")
+            self.Text.append(f"\tcmp {op1}, {op2}")
         else:
             op1 = self.GenNode(Node['Op1'])
             op2 = self.GenNode(Node['Op2'])
 
-            self.Text.append(f"\tucomis{self.GetDataSize(size, type_='Simd')} {self.ensureload(op1, size, type_='Simd')}, {self.ensureload(op2, size, type_='Simd')}")
+            self.Text.append(f"\tucomis{self.GetDataSize(size, type_='Simd')} {op1}, {op2}")
         
         reg = self.GetReg("16")
         reg2 = self.GetReg("16")
@@ -2063,9 +2075,9 @@ class CodeGen:
         self.FloatSizes = Node['Type']['Size']
 
         reg = self.GetReg(Node['Type']['Size'])
-        self.Text.append(f"\tmov {self.GetDataSize(Node['Type']['Size'])} {reg}, {self.ensureload(self.GenNode(Node['Val']), Node['Type']['Size'])}")
+        self.Text.append(f"\tmov {self.GetDataSize(Node['Type']['Size'])} {reg}, {self.GenNode(Node['Val'])}")
         self.ReserveReg("rcx", "64")
-        self.Text.append(f"\tmov cl, {self.GetSizeOfReg('8', self.ensureload(self.GenNode(Node['Num']), Node['Type']['Size']))}")
+        self.Text.append(f"\tmov cl, {self.GetSizeOfReg('8', self.GenNode(Node['Num']))}")
         self.ReturnReserve("rcx", "64")
         self.Text.append(f"\t{Node['Inst']} {reg}, cl")
         
@@ -2107,12 +2119,41 @@ class CodeGen:
             "Simd" : False,
         })
 
-
+    def GenLable(self, Node):
+        self.Text.append(f"{Node.get('Name')[1:]}")
+        self.Env.AddVar(Node['Name'][:-1],{
+                "Type" : {
+                    "Kind" : "Primitive",
+                    "Val" : "i64",
+                    "Size" : "64",
+                },
+                "Register" : Node['Name'][1:-1],
+                "MustLoad" : False,
+                "InReg" : False,
+			    "Ditch" : False,
+                "Simd" : False,
+        })
+        self.VarWithRegName.append(Node['Name'][:-1])
+        for i in Node.get('Body'):
+            self.GenNode(i)
+    def GenGlobalextern(self, Node):
+        self.Text.append(f"extern {Node['Name'][1:]}")
+        self.Env.AddVar(Node['Name'],{
+                "Type" : Node['Type'],
+                "Register" : Node['Name'][1:],
+                "MustLoad" : False,
+                "InReg" : False,
+			    "Ditch" : False,
+                "Simd" : False,
+        })
+        self.VarWithRegName.append(Node['Name'][1:])
     def GenNode(self, Node):
         kind = Node['Kind']
        
         if kind == "FunctionNode":
             return self.GenFunc(Node)
+        elif kind == "Lable":
+            return self.GenLable(Node) 
         elif kind == "Shift":
             return self.GenShift(Node)
         elif kind == "Cast":
@@ -2141,6 +2182,8 @@ class CodeGen:
             return self.GenFloat(Node)
         elif kind == "GetPtrNode":
             return self.GenPtrNode(Node)
+        elif kind == "Globalextern":
+            return self.GenGlobalextern(Node) 
         elif kind == "Integer":
             return self.GenInt(Node)
         elif kind == "LoadNode":

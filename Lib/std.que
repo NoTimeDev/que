@@ -34,6 +34,7 @@ def @memcpy(ptr $src, ptr $dest, i64 $size) -> void {
     icmp i64 ne $size, 0 -> $.3 
     if $.3, @loop_body 
     goto @loop_end
+end 
 @loop_body:
     load $size, i64 -> $.9
     sub i64 $.9, 1 -> $.10 
@@ -49,7 +50,9 @@ def @memcpy(ptr $src, ptr $dest, i64 $size) -> void {
     store i64 $.p4, $d 
 
     goto @loop_cond
+end
 @loop_end:
     ret void 
+end
 }
 

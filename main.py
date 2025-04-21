@@ -58,7 +58,9 @@ def main(argv: list[str] = sys.argv, argc: list[str] = len(sys.argv)):
             smac = argv[argv.index('-smac') + 1]
         else:
             smac = ""
-        CodeGenClass: CodeGen = CodeGen(Ast, Parser_Class.Meta, platform_, smac)
+        CodeGenClass: CodeGen = CodeGen(Ast, Parser_Class.Meta, platform_, smac, {
+            "-nomain" : "-nomain" in argv
+        })
         Cont = CodeGenClass.Gen()
         
         Name = "out"

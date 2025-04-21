@@ -13,7 +13,8 @@ class Parser:
         
         self.Meta: dict = {
             "Funcs" : {},
-            "Structs" : {}
+            "Structs" : {},
+            "global" : {}
         }
         self.MacTbl: list = []
 
@@ -252,7 +253,19 @@ class Parser:
 
     def ParseExtern(self) -> dict:
         self.Advance()
-        
+       
+        if self.CToken().Kind == TokenKind.global_inst:
+            self.Advance()
+            Name = self.Expect(TokenKind.global_ident, "a global name")
+            self.Expect(TokenKind.comma, ',')
+            Type_ = self.ParseType()
+
+            return {
+                "Kind" : "Globalextern",
+                "Name" : Name.Value,
+                "Type" : Type_
+            }
+
         Name = self.Expect(TokenKind.global_ident, "a global name")
         self.Expect(TokenKind.open_paren, "(")
         Types = []
@@ -855,11 +868,24 @@ class Parser:
     def ParseIdent(self) -> dict:
         Name = self.Advance()
 
+        if Name.Value[0] == "@" and Name.Value[-1] == ':':
+            self.Meta['global'].update({Name.Value[:-1] : True})
+            Body = []
+            while self.CToken().Kind != TokenKind.end:
+                Body.append(self.ParseStmt())
+            self.Expect(TokenKind.end, "end")
+            return {
+                "Kind" : "Lable",
+                "Body" : Body,
+                "Name" : Name.Value
+            }
+
         if Name.Value[0] == "@":
+            self.Meta['global'].update({Name.Value : True})
             Kind = "GIdent"
         else:
             Kind = "LIdent"
-        
+            
         return {
             "Kind" : Kind,
             "Name" : Name.Value,
@@ -1077,8 +1103,8 @@ class Parser:
         elif tk.Kind in [TokenKind.cmp_inst, TokenKind.icmp_inst, TokenKind.fcmp_inst]:
             return self.ParseCmp()
         else:
-            self.errcls.throwerr(tk.Line, tk.Start, tk.End, "expected an expression")
-            self.Advance()
+            print(self.Advance())
 
+            self.errcls.throwerr(tk.Line, tk.Start, tk.End, "expected an expression")
         return {"Kind" : "ignore"}
 

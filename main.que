@@ -1,9 +1,39 @@
 include "./Lib/std.que"
-const global [14]i8, 14 -> @str1 = [!str"Hello, World\n"]
 
-def @main() -> i32{
+const global [7]i8, 7 -> @str1 = [!str"Error!\n"]
+const global [7]i8, 7 -> @str2 = [!str"Catch!\n"]
+
+global ptr, 8 -> @eblock = @eset
+global i64, 8 -> @rsps
+global i64, 8 -> @rbps
+
+@eset:
     getptr @str1, ptr -> $.ptr1
-    call @SYSCALL(i32 1, i32 1, ptr $.ptr1, i32 14), void
+    call @SYSCALL(i32 1, i32 1, ptr $.ptr1, i32 7), void
+    call @SYSCALL(i32 60, i32 1), void
+end
+
+def @add() -> i32{
+    #throw error
+    getptr @eblock, ptr -> $.eptr
+    goto $.eptr
+    ret void
+}
+
+def @main() -> i32{ 
+    !asmtext "mov [rbps], rbp"
+    !asmtext "mov [rsps], rsp"
+    getptr @eblock, ptr -> $.eptr
+    getptr @Catch, ptr -> $.eset 
+    store ptr $.eset, *$.eptr
+    call @add(), void
+
+    @Catch:
+        !asmtext "mov rbp, [rbps]"
+        !asmtext "mov rsp, [rsps]"
+        getptr @str2, ptr -> $.ptr1
+        call @SYSCALL(i32 1, i32 1, ptr $.ptr1, i32 7), void
+    end
     ret 1, i32 
 }
 

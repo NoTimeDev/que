@@ -172,7 +172,8 @@ class Lexer:
                     "sar" : TokenKind.ashr_inst,
                     "shr" : TokenKind.shr_inst,
                     "shl" : TokenKind.shl_inst,
-
+                    
+                    "end" : TokenKind.end,
                     "trunc" : TokenKind.trunc_inst, 
                     
                     "iext" : TokenKind.iext_inst, 

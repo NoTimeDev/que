@@ -13,6 +13,7 @@ class TokenKind(Enum):
     load_inst = auto()
     loadptr_inst = auto()
     ret_inst = auto()
+    end = auto()
 
     add_inst = auto()
     sub_inst = auto()
